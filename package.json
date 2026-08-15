@@ -1,0 +1,60 @@
+{
+  "name": "@tropmail/sdk",
+  "version": "1.0.0",
+  "description": "Official TypeScript SDK for the TropMail API",
+  "keywords": [
+    "tropmail",
+    "email",
+    "webmail",
+    "api",
+    "sdk",
+    "cloudflare-workers"
+  ],
+  "homepage": "https://tropmail.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tropmail/tropmail-sdk.git"
+  },
+  "license": "MIT",
+  "author": "TropMail",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "lint": "npm run typecheck",
+    "contract": "vitest run tests/contract.test.ts",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsup": "^8",
+    "typescript": "^5",
+    "vitest": "^2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
