@@ -13,7 +13,7 @@
   "homepage": "https://tropmail.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tropmail/tropmail-sdk.git"
+    "url": "https://github.com/TropMail/tropmail-sdk"
   },
   "license": "MIT",
   "author": "TropMail",
