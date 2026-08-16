@@ -19,15 +19,22 @@ async function main(): Promise<void> {
   let blocked = 0;
 
   try {
+  const { mailboxes } = await client.mailboxes.list({ signal: controller.signal });
+    const mailboxId = mailboxes[0]?.id;
+    if (!mailboxId) {
+      console.log("This API key has no mailboxes.");
+      return;
+    }
+
     // The iterator pages for you and stops on the first short page. Requests
     // are paced to the tier's rate limit, so a full walk never collects 429s.
-    for await (const email of client.emails.iterate({ signal: controller.signal })) {
+    for await (const email of client.emails.iterate({ mailboxId, signal: controller.signal })) {
       try {
         if (email.action_status === "Phishing") {
-          await client.emails.block(email, { signal: controller.signal });
+          await client.emails.block(mailboxId, email, { signal: controller.signal });
           blocked += 1;
         } else if (email.subject.toLowerCase().includes(term)) {
-          await client.emails.favorite(email, { signal: controller.signal });
+          await client.emails.favorite(mailboxId, email, { signal: controller.signal });
           favorited += 1;
         }
       } catch (error) {

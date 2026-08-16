@@ -6,7 +6,7 @@
  * import { TropMail } from "@tropmail/sdk";
  *
  * const client = new TropMail({ apiKey: process.env.TROPMAIL_API_KEY! });
- * const mailbox = await client.mailbox.get();
+ * const { mailboxes } = await client.mailboxes.list();
  * ```
  *
  * @packageDocumentation
@@ -18,6 +18,7 @@ export {
   DEFAULT_TIMEOUT_MS,
   TropMail,
 } from "./client.js";
+export { VERSION } from "./version.js";
 
 export {
   AuthenticationError,
@@ -35,7 +36,7 @@ export { validateApiKey } from "./auth.js";
 
 export type { RateLimitSnapshot } from "./rate-limit.js";
 
-export { MailboxResource } from "./resources/mailbox.js";
+export { MailboxesResource } from "./resources/mailboxes.js";
 export { EmailsResource } from "./resources/emails.js";
 export { AttachmentsResource } from "./resources/attachments.js";
 
@@ -60,6 +61,7 @@ export type {
   IterateEmailsOptions,
   ListEmailsOptions,
   ListStatus,
+  MailboxList,
   MailboxSummary,
   RequestOptions,
   ScanEngineResult,
@@ -71,5 +73,4 @@ export type {
   Tier,
   TropMailOptions,
   UpdateEmailOptions,
-  ValidateResponse,
 } from "./types.js";

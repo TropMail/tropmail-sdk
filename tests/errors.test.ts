@@ -11,7 +11,7 @@ import {
   TropMailError,
   ValidationError,
 } from "../src/index.js";
-import { errorResponse, makeClient } from "./helpers.js";
+import { errorResponse, MAILBOX_ID, makeClient } from "./helpers.js";
 
 describe("error mapping", () => {
   it.each([
@@ -23,12 +23,12 @@ describe("error mapping", () => {
     [503, ServerError],
   ])("maps HTTP %i", async (status, expected) => {
     const { client } = makeClient(() => errorResponse(status, "boom"));
-    await expect(client.mailbox.get()).rejects.toBeInstanceOf(expected);
+    await expect(client.mailboxes.get(MAILBOX_ID)).rejects.toBeInstanceOf(expected);
   });
 
   it("keeps status, message and request id on the error", async () => {
     const { client } = makeClient(() => errorResponse(404, "Email not found"));
-    const error = await client.emails.get("nope").catch((e: unknown) => e);
+    const error = await client.emails.get(MAILBOX_ID, "nope").catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(NotFoundError);
     const typed = error as NotFoundError;
@@ -39,7 +39,7 @@ describe("error mapping", () => {
 
   it("handles the plain-text 404 from unknown routes", async () => {
     const { client } = makeClient(() => new Response("Not Found", { status: 404 }));
-    const error = await client.mailbox.get().catch((e: unknown) => e);
+    const error = await client.mailboxes.get(MAILBOX_ID).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(NotFoundError);
     expect((error as NotFoundError).message).toBe("Not Found");
@@ -49,7 +49,7 @@ describe("error mapping", () => {
     const { client } = makeClient(() =>
       errorResponse(429, "Rate limit exceeded", { "Retry-After": "2" }),
     );
-    const error = await client.mailbox.get().catch((e: unknown) => e);
+    const error = await client.mailboxes.get(MAILBOX_ID).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(RateLimitError);
     expect((error as RateLimitError).retryAfter).toBe(2);
@@ -57,7 +57,7 @@ describe("error mapping", () => {
 
   it("uses a dedicated type for the markdown timeout", async () => {
     const { client } = makeClient(() => errorResponse(504, "Markdown conversion timed out"));
-    await expect(client.emails.getMarkdown("abc")).rejects.toBeInstanceOf(
+    await expect(client.emails.getMarkdown(MAILBOX_ID, "abc")).rejects.toBeInstanceOf(
       MarkdownTimeoutError,
     );
   });
@@ -66,7 +66,7 @@ describe("error mapping", () => {
     const { client } = makeClient(() => {
       throw new Error("network down");
     });
-    await expect(client.mailbox.get()).rejects.toBeInstanceOf(ConnectionError);
+    await expect(client.mailboxes.get(MAILBOX_ID)).rejects.toBeInstanceOf(ConnectionError);
   });
 
   it("treats success:false as an error even on HTTP 200", async () => {
@@ -77,7 +77,7 @@ describe("error mapping", () => {
           { status: 200, headers: { "content-type": "application/json" } },
         ),
     );
-    const error = await client.mailbox.get().catch((e: unknown) => e);
+    const error = await client.mailboxes.get(MAILBOX_ID).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(TropMailError);
     expect((error as TropMailError).message).toBe("nope");
@@ -85,7 +85,7 @@ describe("error mapping", () => {
 
   it("every error is an instance of the base class", async () => {
     const { client } = makeClient(() => errorResponse(403, "Basic tier"));
-    await expect(client.mailbox.get()).rejects.toBeInstanceOf(TropMailError);
+    await expect(client.mailboxes.get(MAILBOX_ID)).rejects.toBeInstanceOf(TropMailError);
   });
 });
 
@@ -97,7 +97,7 @@ describe("abort", () => {
       throw new DOMException("Aborted", "AbortError");
     });
 
-    await expect(client.mailbox.get({ signal: controller.signal })).rejects.toBeInstanceOf(
+    await expect(client.mailboxes.get(MAILBOX_ID, { signal: controller.signal })).rejects.toBeInstanceOf(
       ConnectionError,
     );
   });

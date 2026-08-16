@@ -2,9 +2,11 @@ import { ConnectionError, TropMailError, createErrorFromStatus } from "./errors.
 import { RateLimitTracker } from "./rate-limit.js";
 import { TokenBucket, sleep } from "./throttle.js";
 import type { ApiEnvelope, ResolvedClientConfig } from "./types.js";
+import { VERSION } from "./version.js";
+
+const USER_AGENT = `@tropmail/sdk/${VERSION}`;
 
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
-const READ_ONLY_POST_PATHS = new Set(["/emails", "/emails/search"]);
 
 /** Internal description of a single API call. */
 export interface RequestSpec {
@@ -36,7 +38,7 @@ function isRetryable(spec: RequestSpec): boolean {
   if (spec.method === "GET") {
     return true;
   }
-  return spec.method === "POST" && READ_ONLY_POST_PATHS.has(spec.path);
+  return false;
 }
 
 /** Build a full request URL from base + path + query. */
@@ -135,6 +137,7 @@ export async function request<T>(context: ClientContext, spec: RequestSpec): Pro
 
   const headers: Record<string, string> = {
     Accept: "application/json",
+    "User-Agent": USER_AGENT,
     "X-Request-ID": randomRequestId(),
   };
   if (spec.auth !== false) {
@@ -252,6 +255,7 @@ export async function requestBinary(context: ClientContext, spec: RequestSpec): 
 
   const headers: Record<string, string> = {
     Accept: "*/*",
+    "User-Agent": USER_AGENT,
     "X-Request-ID": randomRequestId(),
   };
   if (spec.auth !== false) {

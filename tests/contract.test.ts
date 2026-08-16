@@ -1,9 +1,9 @@
 /**
- * Fails when the SDK stops covering every route in the OpenAPI spec.
+ * Fails when the SDK stops covering every canonical route in the OpenAPI spec.
  *
- * The spec lives in this package (`spec/openapi.json`). When `Docs/` is
- * checked out next to `Sdk/` in the TropMail workspace, the test also
- * asserts they match.
+ * Docs list inboxes at `/mailboxes` and every other operation at `/mailbox/{id}`.
+ * The client still calls the `/mailboxes/{id}` alias; those requests are mapped
+ * onto the documented singular templates.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { jsonResponse, makeClient } from "./helpers.js";
+import { jsonResponse, MAILBOX_ID, makeClient } from "./helpers.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, "..");
@@ -41,20 +41,46 @@ function specOperations(): Set<string> {
   return operations;
 }
 
-/** Turn a concrete request path back into its OpenAPI template. */
 function templatize(pathname: string): string {
-  return pathname
-    .replace(/^\/api\/v1/, "")
-    .replace(/^\/email\/[^/]+\/(text|html|markdown)$/, "/email/{id}/{view}")
-    .replace(/^\/email\/[^/]+\/scan-attachments$/, "/email/{id}/scan-attachments")
-    .replace(/^\/email\/[^/]+\/download-attachments$/, "/email/{id}/download-attachments")
-    .replace(/^\/attachment\/[^/]+\/scan$/, "/attachment/{id}/scan")
-    .replace(/^\/attachment\/[^/]+\/download$/, "/attachment/{id}/download")
-    .replace(/^\/attachment\/[^/]+$/, "/attachment/{id}")
-    .replace(/^\/email\/[^/]+$/, "/email/{id}");
+  let path = pathname.replace(/^\/api\/v1/, "");
+  if (path.startsWith("/mailboxes/")) {
+    path = `/mailbox/${path.slice("/mailboxes/".length)}`;
+  }
+  const rules: [RegExp, string][] = [
+    [
+      /^\/mailbox\/[^/]+\/emails\/[^/]+\/(text|html|markdown)$/,
+      "/mailbox/{id}/emails/{emailId}/{view}",
+    ],
+    [/^\/mailbox\/[^/]+\/emails\/search$/, "/mailbox/{id}/emails/search"],
+    [
+      /^\/mailbox\/[^/]+\/emails\/[^/]+\/scan-attachments$/,
+      "/mailbox/{id}/emails/{emailId}/scan-attachments",
+    ],
+    [
+      /^\/mailbox\/[^/]+\/emails\/[^/]+\/download-attachments$/,
+      "/mailbox/{id}/emails/{emailId}/download-attachments",
+    ],
+    [
+      /^\/mailbox\/[^/]+\/attachments\/[^/]+\/scan$/,
+      "/mailbox/{id}/attachments/{attId}/scan",
+    ],
+    [
+      /^\/mailbox\/[^/]+\/attachments\/[^/]+\/download$/,
+      "/mailbox/{id}/attachments/{attId}/download",
+    ],
+    [/^\/mailbox\/[^/]+\/attachments\/[^/]+$/, "/mailbox/{id}/attachments/{attId}"],
+    [/^\/mailbox\/[^/]+\/emails\/[^/]+$/, "/mailbox/{id}/emails/{emailId}"],
+    [/^\/mailbox\/[^/]+\/emails$/, "/mailbox/{id}/emails"],
+    [/^\/mailbox\/[^/]+$/, "/mailbox/{id}"],
+  ];
+  for (const [pattern, template] of rules) {
+    if (pattern.test(path)) {
+      return path.replace(pattern, template);
+    }
+  }
+  return path;
 }
 
-/** Superset of every payload shape, so one response satisfies any call. */
 const ANY_PAYLOAD = {
   id: "11111111-1111-1111-1111-111111111111",
   email: "user@tropmail.com",
@@ -62,6 +88,7 @@ const ANY_PAYLOAD = {
   from: { name: "Sender", address: "sender@example.com" },
   attachment_id: "22222222-2222-2222-2222-222222222222",
   status: "ok",
+  mailboxes: [],
 };
 
 async function exerciseEveryMethod(): Promise<Set<string>> {
@@ -82,19 +109,19 @@ async function exerciseEveryMethod(): Promise<Set<string>> {
       : jsonResponse(ANY_PAYLOAD);
   });
 
-  await client.mailbox.health();
-  await client.mailbox.validate();
-  await client.mailbox.get();
-  await client.emails.list();
-  await client.emails.search({ query: "q" });
-  await client.emails.get("id");
-  await client.emails.get("id", { view: "markdown" });
-  await client.emails.update("id", { emailState: "Open" });
-  await client.emails.scanAttachments("id");
-  await client.emails.downloadAttachments("id");
-  await client.attachments.get("aid");
-  await client.attachments.scan("aid");
-  await client.attachments.download("aid");
+  await client.health();
+  await client.mailboxes.list();
+  await client.mailboxes.get(MAILBOX_ID);
+  await client.emails.list({ mailboxId: MAILBOX_ID });
+  await client.emails.search({ mailboxId: MAILBOX_ID, query: "q" });
+  await client.emails.get(MAILBOX_ID, "id");
+  await client.emails.get(MAILBOX_ID, "id", { view: "markdown" });
+  await client.emails.update(MAILBOX_ID, "id", { emailState: "Open" });
+  await client.emails.scanAttachments(MAILBOX_ID, "id");
+  await client.emails.downloadAttachments(MAILBOX_ID, "id");
+  await client.attachments.get(MAILBOX_ID, "aid");
+  await client.attachments.scan(MAILBOX_ID, "aid");
+  await client.attachments.download(MAILBOX_ID, "aid");
 
   return seen;
 }
@@ -111,7 +138,7 @@ describe("openapi contract", () => {
     expect(loadSpec(DOC_SPEC_PATH)).toEqual(loadSpec(SPEC_PATH));
   });
 
-  it("covers every documented route", async () => {
+  it("covers every documented canonical route", async () => {
     const covered = await exerciseEveryMethod();
     const missing = [...specOperations()].filter((op) => !covered.has(op));
     expect(missing).toEqual([]);

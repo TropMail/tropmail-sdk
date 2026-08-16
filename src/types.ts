@@ -25,7 +25,7 @@ export type ScanStatus =
   | "Suspicious"
   | "Unknown";
 
-/** Account tier returned by validate. */
+/** Account tier. */
 export type Tier = "Basic" | "Pro" | "Ultimate" | "Enterprise";
 
 /** Email address object used across list and detail responses. */
@@ -40,7 +40,7 @@ export interface EmailListItem {
   timestamp: string;
   subject: string;
   from: EmailAddress;
-  body: string;
+  preview: string;
   attachmentsCount: number;
   email_state: EmailState;
   /** Omitted by the API when no action is set. */
@@ -140,10 +140,9 @@ export interface MailboxSummary {
   favorite_count: number;
 }
 
-/** Validate response. */
-export interface ValidateResponse {
-  mailbox_id: string;
-  tier: Tier;
+/** Paginated mailbox list. */
+export interface MailboxList {
+  mailboxes: MailboxSummary[];
 }
 
 /** Health check response. */
@@ -180,7 +179,7 @@ export interface ScanResponse {
 }
 
 /**
- * Metadata from `GET /email/{id}/download-attachments`.
+ * Metadata from `GET /mailboxes/{id}/emails/{emailId}/download-attachments`.
  * Fetch bytes with `attachments.download(attachment_id)`.
  */
 export interface DownloadResponse {
@@ -221,6 +220,7 @@ export interface RequestOptions {
 
 /** Options for listing emails. */
 export interface ListEmailsOptions extends RequestOptions {
+  mailboxId: string;
   limit?: number;
   page?: number;
   status?: ListStatus;
@@ -228,6 +228,7 @@ export interface ListEmailsOptions extends RequestOptions {
 
 /** Options for searching emails. */
 export interface SearchEmailsOptions extends RequestOptions {
+  mailboxId: string;
   query: string;
   limit?: number;
   page?: number;
@@ -235,6 +236,7 @@ export interface SearchEmailsOptions extends RequestOptions {
 
 /** Options for iterating emails. */
 export interface IterateEmailsOptions extends RequestOptions {
+  mailboxId: string;
   status?: ListStatus;
   limit?: number;
 }

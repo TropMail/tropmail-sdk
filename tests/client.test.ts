@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_BASE_URL, TropMail, ValidationError } from "../src/index.js";
+import { DEFAULT_BASE_URL, TropMail, ValidationError, VERSION } from "../src/index.js";
 import {
   API_KEY,
   BASE_URL,
   EMAIL_DETAIL,
   EMAIL_ITEM,
+  MAILBOX_ID,
   jsonResponse,
   makeClient,
 } from "./helpers.js";
@@ -42,18 +43,19 @@ describe("client construction", () => {
 describe("requests", () => {
   it("sends bearer auth and a correlation id", async () => {
     const { client, calls } = makeClient(() => jsonResponse({ id: "m1", email: "a@b.dev" }));
-    await client.mailbox.get();
+    await client.mailboxes.get(MAILBOX_ID);
 
     expect(calls[0]?.headers.get("Authorization")).toBe(`Bearer ${API_KEY}`);
+    expect(calls[0]?.headers.get("User-Agent")).toBe(`@tropmail/sdk/${VERSION}`);
     expect(calls[0]?.headers.get("X-Request-ID")).toBeTruthy();
-    expect(calls[0]?.url.pathname).toBe("/api/v1/mailbox");
+    expect(calls[0]?.url.pathname).toBe(`/api/v1/mailboxes/${MAILBOX_ID}`);
   });
 
   it("omits authorization on the health probe", async () => {
     const { client, calls } = makeClient(() =>
       jsonResponse({ status: "ok", version: "1.0.0", timestamp: "t" }),
     );
-    const health = await client.mailbox.health();
+    const health = await client.health();
 
     expect(calls[0]?.headers.get("Authorization")).toBeNull();
     expect(health.status).toBe("ok");
@@ -69,36 +71,38 @@ describe("requests", () => {
         favorite_count: 1,
       }),
     );
-    const mailbox = await client.mailbox.get();
+    const mailbox = await client.mailboxes.get(MAILBOX_ID);
 
     expect(mailbox.email).toBe("user@tropmail.com");
     expect(mailbox.opened_count).toBe(3);
   });
 
-  it("sends list parameters in the body", async () => {
+  it("sends list parameters as query", async () => {
     const { client, calls } = makeClient(() =>
       jsonResponse({ emails: [EMAIL_ITEM], total: 5, limit: 25, page: 2 }),
     );
-    await client.emails.list({ limit: 25, page: 2, status: "Favorite" });
+    await client.emails.list({ mailboxId: MAILBOX_ID, limit: 25, page: 2, status: "Favorite" });
 
-    expect(calls[0]?.method).toBe("POST");
-    expect(calls[0]?.body).toEqual({ limit: 25, page: 2, status: "Favorite" });
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.url.searchParams.get("limit")).toBe("25");
+    expect(calls[0]?.url.searchParams.get("page")).toBe("2");
+    expect(calls[0]?.url.searchParams.get("status")).toBe("Favorite");
   });
 
   it("uses the bare path for the html view and appends other views", async () => {
     const { client, calls } = makeClient(() => jsonResponse(EMAIL_DETAIL));
-    await client.emails.get("abc");
-    await client.emails.get("abc", { view: "text" });
+    await client.emails.get(MAILBOX_ID, "abc");
+    await client.emails.get(MAILBOX_ID, "abc", { view: "text" });
 
     expect(calls.map((c) => c.url.pathname)).toEqual([
-      "/api/v1/email/abc",
-      "/api/v1/email/abc/text",
+      `/api/v1/mailboxes/${MAILBOX_ID}/emails/abc`,
+      `/api/v1/mailboxes/${MAILBOX_ID}/emails/abc/text`,
     ]);
   });
 
   it("forwards the timestamp carried by an email object", async () => {
     const { client, calls } = makeClient(() => jsonResponse(EMAIL_DETAIL));
-    await client.emails.get(EMAIL_ITEM);
+    await client.emails.get(MAILBOX_ID, EMAIL_ITEM);
 
     expect(calls[0]?.url.searchParams.get("timestamp")).toBe("2026-01-01T00:00:00Z");
   });
@@ -118,13 +122,13 @@ describe("requests", () => {
     );
 
     expect(client.rateLimit.limit).toBeNull();
-    await client.mailbox.get();
+    await client.mailboxes.get(MAILBOX_ID);
     expect(client.rateLimit).toMatchObject({ limit: 3, remaining: 2, reset: 1767225600 });
   });
 
   it("parses an email detail with attachments", async () => {
     const { client } = makeClient(() => jsonResponse(EMAIL_DETAIL));
-    const detail = await client.emails.get("abc");
+    const detail = await client.emails.get(MAILBOX_ID, "abc");
 
     expect(detail.attachments[0]?.filename).toBe("invoice.pdf");
     expect(detail.to[0]?.address).toBe("me@tropmail.com");
@@ -134,14 +138,14 @@ describe("requests", () => {
 describe("actions", () => {
   it("requires at least one field", async () => {
     const { client } = makeClient(() => jsonResponse({}));
-    await expect(client.emails.update("abc", {})).rejects.toThrow(TypeError);
+    await expect(client.emails.update(MAILBOX_ID, "abc", {})).rejects.toThrow(TypeError);
   });
 
   it("sends the block action and parses the sender", async () => {
     const { client, calls } = makeClient(() =>
       jsonResponse({ action_status: "Block", sender_email: "spam@bad.test" }),
     );
-    const result = await client.emails.block("abc");
+    const result = await client.emails.block(MAILBOX_ID, "abc");
 
     expect(calls[0]?.body).toEqual({ action_status: "Block" });
     expect(result.sender_email).toBe("spam@bad.test");
@@ -149,14 +153,14 @@ describe("actions", () => {
 
   it("clears an action with an empty string", async () => {
     const { client, calls } = makeClient(() => jsonResponse({ action_status: null }));
-    await client.emails.clearAction("abc");
+    await client.emails.clearAction(MAILBOX_ID, "abc");
 
     expect(calls[0]?.body).toEqual({ action_status: "" });
   });
 
   it("includes the timestamp from an email object", async () => {
     const { client, calls } = makeClient(() => jsonResponse({ email_id: "x" }));
-    await client.emails.favorite(EMAIL_ITEM);
+    await client.emails.favorite(MAILBOX_ID, EMAIL_ITEM);
 
     expect(calls[0]?.body).toEqual({
       action_status: "Favorite",

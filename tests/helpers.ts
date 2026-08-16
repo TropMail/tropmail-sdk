@@ -2,6 +2,7 @@ import { TropMail } from "../src/index.js";
 import type { EmailDetail, EmailListItem } from "../src/types.js";
 
 export const API_KEY = "a".repeat(32);
+export const MAILBOX_ID = "550e8400-e29b-41d4-a716-446655440000";
 export const BASE_URL = "https://api.example.test/api/v1";
 
 export interface RecordedRequest {
@@ -89,7 +90,7 @@ export const EMAIL_ITEM: EmailListItem = {
   timestamp: "2026-01-01T00:00:00Z",
   subject: "Welcome",
   from: { name: "Sender", address: "sender@example.com" },
-  body: "Preview text",
+  preview: "Preview text",
   attachmentsCount: 1,
   email_state: "Open",
   action_status: "Favorite",

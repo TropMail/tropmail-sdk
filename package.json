@@ -1,14 +1,13 @@
 {
   "name": "@tropmail/sdk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Official TypeScript SDK for the TropMail API",
   "keywords": [
     "tropmail",
     "email",
     "webmail",
     "api",
-    "sdk",
-    "cloudflare-workers"
+    "sdk"
   ],
   "homepage": "https://tropmail.com",
   "repository": {

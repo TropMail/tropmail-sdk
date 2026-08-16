@@ -1,15 +1,16 @@
 import { ValidationError } from "./errors.js";
 
-const API_KEY_PATTERN = /^[A-Za-z0-9]{32}$/;
+const LEGACY_KEY = /^[A-Za-z0-9]{32}$/;
+const LIVE_KEY = /^tm_live_[A-Za-z0-9]{32}$/;
 
 /**
- * Validate that an API key matches the required format (32 alphanumeric characters).
- * Fails fast before any network request.
+ * Validate that an API key matches issued TropMail secrets:
+ * 32 alphanumeric characters, optionally prefixed with `tm_live_`.
  */
 export function validateApiKey(apiKey: string): void {
-  if (!API_KEY_PATTERN.test(apiKey)) {
+  if (!LEGACY_KEY.test(apiKey) && !LIVE_KEY.test(apiKey)) {
     throw new ValidationError(
-      "API key must be exactly 32 alphanumeric characters",
+      "API key must be 32 alphanumeric characters, optionally prefixed with tm_live_",
       0,
     );
   }

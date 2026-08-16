@@ -1,10 +1,10 @@
 /**
- * A Cloudflare Worker that exposes the mailbox as JSON.
+ * A fetch handler that exposes the mailbox as JSON.
  *
  * The SDK has no dependencies and no `node:` imports, so it runs unchanged on
- * Workers. Bind the API key as a secret:
+ * fetch-based runtimes. Pass the API key from the environment:
  *
- *   wrangler secret put TROPMAIL_API_KEY
+ *   env.TROPMAIL_API_KEY
  */
 import { TropMail, TropMailError } from "../src/index.js";
 
@@ -18,12 +18,17 @@ export default {
     const client = new TropMail({ apiKey: env.TROPMAIL_API_KEY });
 
     const url = new URL(request.url);
-    const query = url.searchParams.get("q");
-
     try {
+      const { mailboxes } = await client.mailboxes.list({ signal: request.signal });
+      const mailboxId = mailboxes[0]?.id;
+      if (!mailboxId) {
+        return Response.json({ emails: [], count: 0 });
+      }
+
+      const query = url.searchParams.get("q");
       const result = query
-        ? await client.emails.search({ query, limit: 20, signal: request.signal })
-        : await client.emails.list({ limit: 20, status: "Open", signal: request.signal });
+        ? await client.emails.search({ mailboxId, query, limit: 20, signal: request.signal })
+        : await client.emails.list({ mailboxId, limit: 20, status: "Open", signal: request.signal });
 
       return Response.json({
         count: result.emails.length,

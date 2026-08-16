@@ -3,7 +3,7 @@
 Official TypeScript SDK for the [TropMail API](https://api.tropmail.com).
 
 **Zero runtime dependencies.** Built on `fetch`, so it runs on Node 18+, Bun, Deno,
-Cloudflare Workers, and in the browser.
+and other fetch runtimes, including the browser.
 
 ```bash
 npm install @tropmail/sdk
@@ -16,25 +16,31 @@ import { TropMail } from "@tropmail/sdk";
 
 const client = new TropMail({ apiKey: process.env.TROPMAIL_API_KEY! });
 
-const mailbox = await client.mailbox.get();
+const { mailboxes } = await client.mailboxes.list();
+const mailbox = mailboxes[0]!;
 console.log(`${mailbox.email}: ${mailbox.opened_count} opened`);
 
-for await (const email of client.emails.iterate({ status: "Open" })) {
+for await (const email of client.emails.iterate({ mailboxId: mailbox.id, status: "Open" })) {
   console.log(email.timestamp, email.from.address, email.subject);
 }
 ```
 
 On Node the key is read from `TROPMAIL_API_KEY` when you omit `apiKey`.
 
-## Cloudflare Workers
+## Fetch runtimes
 
-No `node:` imports and no globals beyond `fetch`, so it drops straight into a Worker:
+No `node:` imports and no globals beyond `fetch`:
 
 ```ts
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const client = new TropMail({ apiKey: env.TROPMAIL_API_KEY });
-    const page = await client.emails.list({ limit: 25 });
+    const { mailboxes } = await client.mailboxes.list();
+    const mailboxId = mailboxes[0]?.id;
+    if (!mailboxId) {
+      return Response.json({ emails: [] });
+    }
+    const page = await client.emails.list({ mailboxId, limit: 25 });
     return Response.json(page);
   },
 };
@@ -46,10 +52,10 @@ export default {
 rather than a bare id and the SDK forwards its timestamp for a faster lookup.
 
 ```ts
-const page = await client.emails.list({ limit: 10 });
+const page = await client.emails.list({ mailboxId, limit: 10 });
 const email = page.emails[0]!;
 
-const detail = await client.emails.get(email, { view: "text" });
+const detail = await client.emails.get(mailboxId, email, { view: "text" });
 console.log(detail.content);
 
 for (const attachment of detail.attachments) {
@@ -63,44 +69,44 @@ The markdown view is generated on demand and the server can block for up to a
 minute before answering `504`. `getMarkdown()` handles that retry for you:
 
 ```ts
-const detail = await client.emails.getMarkdown(email);
+const detail = await client.emails.getMarkdown(mailboxId, email);
 ```
 
 ## Actions
 
 ```ts
-await client.emails.favorite(email);
-await client.emails.close(email);
-await client.emails.block(email);        // also blocks the sender
-await client.emails.clearAction(email);  // clears it, unblocking the sender
+await client.emails.favorite(mailboxId, email);
+await client.emails.close(mailboxId, email);
+await client.emails.block(mailboxId, email);        // also blocks the sender
+await client.emails.clearAction(mailboxId, email);  // clears it, unblocking the sender
 ```
 
 All of them are shorthands for `update()`:
 
 ```ts
-await client.emails.update(email, { emailState: "Open", actionStatus: "Favorite" });
+await client.emails.update(mailboxId, email, { emailState: "Open", actionStatus: "Favorite" });
 ```
 
 ## Attachments
 
 ```ts
-const info = await client.attachments.get(attachmentId);
-const link = await client.attachments.download(attachmentId);
-const bytes = await client.attachments.downloadBytes(attachmentId);
+const info = await client.attachments.get(mailboxId, attachmentId);
+const link = await client.attachments.download(mailboxId, attachmentId);
+const bytes = await client.attachments.downloadBytes(mailboxId, attachmentId);
 
 // Stream it anywhere — the raw Response is yours.
-const response = await client.attachments.fetchContent(attachmentId);
+const response = await client.attachments.fetchContent(mailboxId, attachmentId);
 await response.body?.pipeTo(destination);
 ```
 
-The download URL lives on a separate host, so no API credentials are sent to it.
+Downloads use your API key on the same host as the rest of the API.
 
 ## Search
 
 ```ts
-const page = await client.emails.search({ query: "invoice", limit: 25 });
+const page = await client.emails.search({ mailboxId, query: "invoice", limit: 25 });
 
-for await (const email of client.emails.searchIterate("invoice")) {
+for await (const email of client.emails.searchIterate("invoice", { mailboxId })) {
   console.log(email.subject);
 }
 ```
@@ -114,7 +120,7 @@ short page rather than trusting `total`.
 import { NotFoundError, RateLimitError, TropMailError } from "@tropmail/sdk";
 
 try {
-  await client.emails.get("does-not-exist");
+  await client.emails.get(mailboxId, "does-not-exist");
 } catch (error) {
   if (error instanceof NotFoundError) {
     console.log(error.status, error.requestId);
@@ -142,10 +148,10 @@ which is what support needs to trace a call.
 
 ## Rate limits
 
-Budgets are per mailbox, per second: Pro 3, Ultimate 10, Enterprise 50.
+Budgets are per account, per second: Pro 3, Ultimate 10, Enterprise 50.
 
-The client reads the limit from response headers and paces itself with a token
-bucket so you stay under the budget instead of collecting `429`s:
+The client reads the limit from response headers and stays within your
+account budget:
 
 ```ts
 console.log(client.rateLimit); // { limit: 3, remaining: 2, reset: 1767225600, retryAfter: null }
@@ -161,8 +167,8 @@ Every method takes `signal` and `timeout`:
 const controller = new AbortController();
 setTimeout(() => controller.abort(), 1_000);
 
-await client.emails.list({ signal: controller.signal });
-await client.emails.list({ timeout: 5_000 });
+await client.emails.list({ mailboxId, signal: controller.signal });
+await client.emails.list({ mailboxId, timeout: 5_000 });
 ```
 
 ## Configuration
@@ -178,13 +184,13 @@ new TropMail({
 });
 ```
 
-Retries use exponential backoff with full jitter on 429, 502, 503, 504, and
+Retries with backoff on 429, 502, 503, 504, and
 transport errors. Reads retry automatically; mutations never do.
 
 ## Examples
 
 Runnable scripts live in [`examples/`](examples/): a quickstart, a bulk triage
-walk with a shared `AbortSignal`, and a Cloudflare Worker.
+walk with a shared `AbortSignal`, and a fetch-based worker entry.
 
 ## Development
 

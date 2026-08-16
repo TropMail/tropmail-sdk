@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RateLimitError, ServerError } from "../src/index.js";
-import { errorResponse, jsonResponse, makeClient, page } from "./helpers.js";
+import { errorResponse, jsonResponse, MAILBOX_ID, makeClient, page } from "./helpers.js";
 
 describe("auto pagination", () => {
   it("stops on a short page rather than trusting total", async () => {
@@ -9,19 +9,19 @@ describe("auto pagination", () => {
     const { client, calls } = makeClient((_req, i) => jsonResponse(pages[i]));
 
     const collected = [];
-    for await (const email of client.emails.iterate({ limit: 10 })) {
+    for await (const email of client.emails.iterate({ mailboxId: MAILBOX_ID, limit: 10 })) {
       collected.push(email);
     }
 
     expect(collected).toHaveLength(23);
-    expect(calls.map((c) => (c.body as { page: number }).page)).toEqual([1, 2, 3]);
+    expect(calls.map((c) => Number(c.url.searchParams.get("page")))).toEqual([1, 2, 3]);
   });
 
   it("stops immediately on an empty page", async () => {
     const { client, calls } = makeClient(() => jsonResponse(page(0, 42)));
 
     const collected = [];
-    for await (const email of client.emails.iterate({ limit: 10 })) {
+    for await (const email of client.emails.iterate({ mailboxId: MAILBOX_ID, limit: 10 })) {
       collected.push(email);
     }
 
@@ -34,7 +34,7 @@ describe("auto pagination", () => {
     const { client } = makeClient((_req, i) => jsonResponse(pages[i]));
 
     const collected = [];
-    for await (const email of client.emails.searchIterate("invoice", { limit: 5 })) {
+    for await (const email of client.emails.searchIterate("invoice", { mailboxId: MAILBOX_ID, limit: 5 })) {
       collected.push(email);
     }
 
@@ -52,7 +52,7 @@ describe("retries", () => {
       { maxRetries: 3 },
     );
 
-    const mailbox = await client.mailbox.get();
+    const mailbox = await client.mailboxes.get(MAILBOX_ID);
     expect(calls).toHaveLength(3);
     expect(mailbox.id).toBe("m1");
   });
@@ -63,7 +63,7 @@ describe("retries", () => {
       { maxRetries: 2 },
     );
 
-    await expect(client.mailbox.get()).rejects.toBeInstanceOf(RateLimitError);
+    await expect(client.mailboxes.get(MAILBOX_ID)).rejects.toBeInstanceOf(RateLimitError);
     expect(calls).toHaveLength(3);
   });
 
@@ -72,7 +72,7 @@ describe("retries", () => {
       maxRetries: 3,
     });
 
-    await expect(client.emails.favorite("abc")).rejects.toBeInstanceOf(ServerError);
+    await expect(client.emails.favorite(MAILBOX_ID, "abc")).rejects.toBeInstanceOf(ServerError);
     expect(calls).toHaveLength(1);
   });
 
@@ -81,17 +81,17 @@ describe("retries", () => {
       maxRetries: 3,
     });
 
-    await expect(client.emails.get("abc")).rejects.toThrow();
+    await expect(client.emails.get(MAILBOX_ID, "abc")).rejects.toThrow();
     expect(calls).toHaveLength(1);
   });
 
-  it("retries read-only posts", async () => {
+  it("retries list GET", async () => {
     const { client, calls } = makeClient(
       (_req, i) => (i < 1 ? errorResponse(503, "unavailable") : jsonResponse(page(0))),
       { maxRetries: 2 },
     );
 
-    await client.emails.list();
+    await client.emails.list({ mailboxId: MAILBOX_ID });
     expect(calls).toHaveLength(2);
   });
 
@@ -116,7 +116,7 @@ describe("retries", () => {
       { maxRetries: 3 },
     );
 
-    const result = await client.emails.getMarkdown("abc");
+    const result = await client.emails.getMarkdown(MAILBOX_ID, "abc");
     expect(calls).toHaveLength(3);
     expect(result.content).toBe("# Heading");
   });

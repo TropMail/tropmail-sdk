@@ -1,3 +1,4 @@
+import { mailboxPrefix } from "./mailboxes.js";
 import { type ClientContext, request, requestBinary } from "../http.js";
 import type {
   AttachmentMetadata,
@@ -5,52 +6,74 @@ import type {
   ScanResponse,
 } from "../types.js";
 
-/** Endpoints under `/attachment/{id}`. */
+function attachmentPath(mailboxId: string, attachmentId: string, extra?: string): string {
+  const base = `${mailboxPrefix(mailboxId)}/attachments/${encodeURIComponent(attachmentId)}`;
+  return extra ? `${base}/${extra}` : base;
+}
+
+/** Endpoints under `/mailboxes/{id}/attachments/{attId}`. */
 export class AttachmentsResource {
   constructor(private readonly context: ClientContext) {}
 
   /** Fetch attachment metadata. */
-  get(attachmentId: string, options: RequestOptions = {}): Promise<AttachmentMetadata> {
+  get(
+    mailboxId: string,
+    attachmentId: string,
+    options: RequestOptions = {},
+  ): Promise<AttachmentMetadata> {
     return request<AttachmentMetadata>(this.context, {
       method: "GET",
-      path: `/attachment/${attachmentId}`,
+      path: attachmentPath(mailboxId, attachmentId),
       ...options,
     });
   }
 
   /** Trigger a malware scan, or return the cached result when already scanned. */
-  scan(attachmentId: string, options: RequestOptions = {}): Promise<ScanResponse> {
+  scan(
+    mailboxId: string,
+    attachmentId: string,
+    options: RequestOptions = {},
+  ): Promise<ScanResponse> {
     return request<ScanResponse>(this.context, {
       method: "POST",
-      path: `/attachment/${attachmentId}/scan`,
+      path: attachmentPath(mailboxId, attachmentId, "scan"),
       retry: false,
       ...options,
     });
   }
 
   /**
-   * Stream attachment bytes from `GET /attachment/{id}/download` (Bearer auth).
+   * Stream attachment bytes from authenticated `GET .../download`.
    * Returns the raw `Response` so callers can write to disk or a Blob.
    */
-  download(attachmentId: string, options: RequestOptions = {}): Promise<Response> {
+  download(
+    mailboxId: string,
+    attachmentId: string,
+    options: RequestOptions = {},
+  ): Promise<Response> {
     return requestBinary(this.context, {
       method: "GET",
-      path: `/attachment/${attachmentId}/download`,
+      path: attachmentPath(mailboxId, attachmentId, "download"),
       ...options,
     });
   }
 
   /** Alias for {@link download}. */
-  fetchContent(attachmentId: string, options: RequestOptions = {}): Promise<Response> {
-    return this.download(attachmentId, options);
+  fetchContent(
+    mailboxId: string,
+    attachmentId: string,
+    options: RequestOptions = {},
+  ): Promise<Response> {
+    return this.download(mailboxId, attachmentId, options);
   }
 
   /** Fetch the attachment bytes as an `ArrayBuffer`. */
   async downloadBytes(
+    mailboxId: string,
     attachmentId: string,
     options: RequestOptions = {},
   ): Promise<ArrayBuffer> {
-    const response = await this.download(attachmentId, options);
+    const response = await this.download(mailboxId, attachmentId, options);
     return response.arrayBuffer();
   }
 }
