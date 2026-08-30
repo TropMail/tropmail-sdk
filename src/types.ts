@@ -83,9 +83,30 @@ export interface Attachment {
   filename?: string;
   size?: number;
   mime_type?: string;
+  /** MIME Content-ID when present (inline images). */
+  content_id?: string | null;
+  /** `inline` or `attachment`. Null on older mail. */
+  disposition?: "inline" | "attachment" | null;
   scan_status: ScanStatus;
   scan_result?: ScanReport;
   scanned_at?: string | null;
+}
+
+/** Optional extras from inbound (newer mail only). */
+export interface EmailParts {
+  listUnsubscribe?: {
+    https?: string | null;
+    mailto?: string | null;
+    oneClick?: boolean;
+  };
+  calendar?: {
+    method: string;
+    uid?: string;
+    /** R2 key for the .ics file. */
+    path: string;
+  };
+  /** Content-ID → attachment_id for cid: images. */
+  inlineCids?: Record<string, string>;
 }
 
 /**
@@ -106,6 +127,8 @@ export interface EmailDetail {
   action_status?: ActionStatus | null;
   status: string;
   attachments: Attachment[];
+  /** Present on newer mail when inbound stored MIME extras. */
+  parts?: EmailParts | null;
   headers: Record<string, unknown>;
   security: Record<string, unknown>;
 }
@@ -159,6 +182,8 @@ export interface AttachmentMetadata {
   filename?: string;
   size?: number;
   mime_type?: string;
+  content_id?: string | null;
+  disposition?: "inline" | "attachment" | null;
   scan_status: ScanStatus;
   scan_result?: ScanReport;
   scanned_at?: string | null;
@@ -179,8 +204,8 @@ export interface ScanResponse {
 }
 
 /**
- * Metadata from `GET /mailboxes/{id}/emails/{emailId}/download-attachments`.
- * Fetch bytes with `attachments.download(attachment_id)`.
+ * Metadata from `GET /mailbox/{id}/emails/{emailId}/download-attachments`.
+ * Fetch bytes with `attachments.download(mailboxId, attachmentId)`.
  */
 export interface DownloadResponse {
   attachment_id: string;
