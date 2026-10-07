@@ -13,8 +13,8 @@ export type ActionStatus =
 /** Content view for email detail endpoints. */
 export type EmailView = "text" | "html" | "markdown";
 
-/** Filter values for list/search endpoints. */
-export type ListStatus = "all" | EmailState | ActionStatus;
+/** Filter values for list/search endpoints. Delete is a write, not a filter. */
+export type ListStatus = "all" | EmailState | Exclude<ActionStatus, "Delete">;
 
 /** Virus scan status for attachments. */
 export type ScanStatus =
