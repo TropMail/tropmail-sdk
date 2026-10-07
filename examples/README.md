@@ -2,7 +2,7 @@
 
 ```bash
 npm install @tropmail/sdk
-export TROPMAIL_API_KEY=your32charalphanumericapikeyhere
+export TROPMAIL_API_KEY=YOUR_API_KEY
 ```
 
 | File | What it shows |

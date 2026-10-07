@@ -286,7 +286,7 @@ export interface UpdateEmailOptions extends RequestOptions {
 
 /** Client configuration. */
 export interface TropMailOptions {
-  /** 32-character API key. Falls back to `TROPMAIL_API_KEY` where available. */
+  /** API key from the dashboard. Starts with `tm_live_`. Falls back to `TROPMAIL_API_KEY` where available. */
   apiKey?: string;
   baseUrl?: string;
   /** Per-request timeout in milliseconds. */

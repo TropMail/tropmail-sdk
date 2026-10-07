@@ -5,7 +5,7 @@ const LIVE_KEY = /^tm_live_[A-Za-z0-9]{32}$/;
 
 /**
  * Validate that an API key matches issued TropMail secrets:
- * 32 alphanumeric characters, optionally prefixed with `tm_live_`.
+ * Dashboard keys start with `tm_live_`. Paste the full secret. Older unprefixed keys still validate.
  */
 export function validateApiKey(apiKey: string): void {
   if (!LEGACY_KEY.test(apiKey) && !LIVE_KEY.test(apiKey)) {
