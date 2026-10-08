@@ -29,7 +29,7 @@ describe("auto pagination", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("pages search results even though total is always zero", async () => {
+  it("pages search results by short pages", async () => {
     const pages = [page(5), page(2)];
     const { client } = makeClient((_req, i) => jsonResponse(pages[i]));
 
