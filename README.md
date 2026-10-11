@@ -78,6 +78,7 @@ const detail = await client.emails.getMarkdown(mailboxId, email);
 await client.emails.favorite(mailboxId, email);
 await client.emails.close(mailboxId, email);
 await client.emails.block(mailboxId, email);        // also blocks the sender
+await client.emails.reportPhishing(mailboxId, email); // files a report; does not block future mail
 await client.emails.clearAction(mailboxId, email);  // clears it, unblocking the sender
 ```
 

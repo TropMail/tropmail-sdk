@@ -204,6 +204,33 @@ export class EmailsResource {
     return this.setAction(mailboxId, ref, "Block", options);
   }
 
+  /** File the message as phishing. It leaves the inbox and does not block future mail. */
+  reportPhishing(
+    mailboxId: string,
+    ref: EmailRef,
+    options: RequestOptions = {},
+  ): Promise<EmailActionResult> {
+    return this.setAction(mailboxId, ref, "Phishing", options);
+  }
+
+  /** File the message as a scam. It leaves the inbox and does not block future mail. */
+  reportScam(
+    mailboxId: string,
+    ref: EmailRef,
+    options: RequestOptions = {},
+  ): Promise<EmailActionResult> {
+    return this.setAction(mailboxId, ref, "Scam", options);
+  }
+
+  /** File the message as malicious. It leaves the inbox and does not block future mail. */
+  reportMalicious(
+    mailboxId: string,
+    ref: EmailRef,
+    options: RequestOptions = {},
+  ): Promise<EmailActionResult> {
+    return this.setAction(mailboxId, ref, "Malicious", options);
+  }
+
   /** Soft-delete an email. */
   delete(
     mailboxId: string,
